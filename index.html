@@ -1,0 +1,296 @@
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor Mestre v6: O Ciclo de Gestão Completo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .hud-stat-bar { background-color: #e0e0e0; border-radius: 9999px; overflow: hidden; height: 1.25rem; box-shadow: inset 0 2px 4px 0 rgba(0,0,0,0.05); }
+        .hud-stat-fill { transition: width 0.5s ease-in-out; text-align: center; color: white; font-weight: bold; font-size: 0.75rem; line-height: 1.25rem; }
+        .modal-backdrop, .tutorial-backdrop { transition: opacity 0.3s ease; }
+        .modal-content, .tutorial-content { transition: transform 0.3s ease; }
+        .project-card { transition: all 0.2s ease-in-out; border: 2px solid transparent; }
+        .project-card.selectable:hover { border-color: #3b82f6; cursor: pointer; transform: translateY(-4px); }
+        .project-card.selected { border-color: #16a34a; background-color: #f0fdf4; }
+        .score-badge { font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 9999px; color: white; }
+        .highlight-overlay { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); border: 2px solid #3b82f6; border-radius: 0.75rem; position: relative; z-index: 100; }
+        .tutorial-backdrop { z-index: 110; } /* FIX: Ensures the tutorial backdrop is on top of the highlight */
+        .tutorial-box { z-index: 120; } /* FIX: Ensures the tutorial box is on top of its backdrop */
+        .tab-btn.active { border-color: #3b82f6; background-color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="game-container" class="min-h-screen container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-4">
+            <h1 class="text-4xl md:text-5xl font-bold text-blue-600">Gestor Mestre: O Ciclo de Gestão</h1>
+            <div class="mt-2">
+                <button id="library-btn" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">📖 Biblioteca de Gestão</button>
+            </div>
+        </header>
+
+        <div id="hud" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-4 bg-white rounded-xl shadow-lg"></div>
+
+        <main id="main-content" class="bg-white p-6 rounded-xl shadow-lg">
+            <div id="start-screen">
+                <h2 class="text-2xl font-bold mb-4">Bem-vindo(a), Gestor(a)!</h2>
+                <p class="mb-6">Sua missão é transformar a UBS Vila Esperança. Antes de começar, um rápido tutorial irá prepará-lo(a) para os desafios.</p>
+                <button id="start-tutorial-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">Iniciar Tutorial</button>
+            </div>
+
+            <div id="game-area" class="hidden">
+                 <div id="scenario-phase">
+                    <div id="scenario-card" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded-md">
+                        <h2 class="text-xl font-bold mb-2">Cenário do Mês: <span id="scenario-title"></span></h2>
+                        <p id="scenario-description"></p>
+                        <div id="problem-gut-score" class="mt-3 font-bold text-right"></div>
+                    </div>
+                    <div id="manager-context" class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded-md">
+                        <h3 class="font-bold">Contexto Gerencial</h3>
+                        <p id="context-text" class="text-sm"></p>
+                    </div>
+                    <div id="diagnosis-step" class="text-center p-4 border-2 border-dashed rounded-lg">
+                        <h3 class="text-xl font-bold mb-2">Etapa 1: Diagnóstico do Problema</h3>
+                        <p class="mb-4 text-gray-600">Use a Matriz GUT para entender a criticidade do problema atual.</p>
+                        <button id="diagnose-problem-btn" class="bg-red-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-red-700 transition-colors shadow-lg">Diagnosticar Problema (GUT)</button>
+                    </div>
+                </div>
+                
+                <div id="solution-phase" class="hidden">
+                    <h3 class="text-2xl font-bold mb-2">Etapa 2: Análise de Soluções</h3>
+                    <p id="instruction-text" class="mb-4 text-gray-600">Problema diagnosticado. Agora, analise as propostas com RICE e BASICO. Depois, finalize para decidir.</p>
+                    <div id="projects-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                    <div class="mt-8 text-center">
+                        <button id="finalize-decision-btn" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 transition-colors shadow-lg">Finalizar Análise e Decidir</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="end-game-screen" class="hidden text-center">
+                 <h2 class="text-3xl font-bold mb-4 text-gray-800">Avaliação de Desempenho Final</h2>
+                 <p class="text-lg mb-2">Após 4 meses, sua gestão na UBS Vila Esperança resultou no seguinte perfil:</p>
+                 <h3 id="manager-profile-title" class="text-2xl font-bold text-blue-600 mb-6"></h3>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-bold mb-2">Gestão Financeira</h4>
+                        <p id="financial-feedback" class="text-sm"></p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-bold mb-2">Foco no Paciente</h4>
+                        <p id="patient-feedback" class="text-sm"></p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-bold mb-2">Visão Estratégica</h4>
+                        <p id="strategic-feedback" class="text-sm"></p>
+                    </div>
+                 </div>
+                 <button id="restart-game-btn" class="mt-8 bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors">Jogar Novamente</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="analysis-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50"></div>
+    <div id="result-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50"></div>
+    <div id="library-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50"></div>
+    <div id="tutorial-overlay" class="tutorial-backdrop fixed inset-0 hidden"> <!-- z-40 class removed -->
+         <div id="tutorial-box" class="tutorial-box absolute bg-white p-6 rounded-lg shadow-2xl max-w-sm"><h3 id="tutorial-title" class="text-xl font-bold mb-2"></h3><p id="tutorial-text" class="text-gray-700 mb-4"></p><div class="flex justify-between items-center"><span id="tutorial-step-counter" class="text-sm text-gray-500"></span><div><button id="tutorial-prev-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-400">Anterior</button><button id="tutorial-next-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Próximo</button></div></div></div>
+    </div>
+
+    <script>
+        // --- BANCO DE DADOS DO JOGO ---
+        const scenarios = [
+            {
+                id: 1,
+                title: "Crise de Atendimento e Reputação",
+                description: "As filas na recepção estão enormes, gerando reclamações diárias nas redes sociais e na ouvidoria da secretaria de saúde.",
+                context: "A secretaria de saúde está sob pressão da mídia local. Eles exigem uma solução que melhore a imagem da UBS e mostre resultados visíveis rapidamente.",
+                expertScores: {
+                    gut: 100, gutReason: "A Gravidade (5) é máxima pelo risco à reputação. A Urgência (5) é alta pela pressão externa. A Tendência (4) é de piora rápida com a disseminação online.",
+                    projects: {
+                        1: { rice: 18.75, basico: 20, reason: "Resolve o problema de pessoal, mas o impacto na imagem é lento e o custo é alto." },
+                        2: { rice: 60.00, basico: 25, reason: "Alto alcance e impacto na satisfação, sendo uma solução moderna que gera boa publicidade." },
+                        3: { rice: 11.25, basico: 22, reason: "Baixo custo, mas não ataca a causa raiz do volume de atendimentos, sendo insuficiente para a crise atual." }
+                    }
+                },
+                projects: [
+                    { id: 1, title: "Contratar mais um recepcionista", cost: 30000, staffCost: 40, effects: { satisfaction: 15, reputation: 5 }, feedback: "Aliviou a equipe e reduziu as filas, um ganho humano imediato." },
+                    { id: 2, title: "Implementar agendamento online", cost: 15000, staffCost: 20, effects: { satisfaction: 20, reputation: 10 }, feedback: "Modernizou a UBS e agradou muitos pacientes, mostrando inovação." },
+                    { id: 3, title: "Treinamento de atendimento para a equipe", cost: 5000, staffCost: 30, effects: { satisfaction: 10, reputation: 5 }, feedback: "Melhorou a qualidade do atendimento e valorizou a equipe com baixo custo." },
+                ]
+            },
+            {
+                id: 2,
+                title: "Falha Crítica de Equipamento",
+                description: "O único aparelho de Eletrocardiograma (ECG) da unidade quebrou. Pacientes precisam ser encaminhados para outras unidades, gerando custos de transporte e insatisfação.",
+                context: "O orçamento do próximo trimestre será cortado em 15%. Cada centavo economizado agora será crucial para manter os serviços básicos funcionando nos próximos meses.",
+                 expertScores: {
+                    gut: 125, gutReason: "Gravidade (5) e Urgência (5) máximas, pois um serviço essencial foi interrompido. A Tendência (5) é de piora, com acúmulo de pacientes e custos.",
+                    projects: {
+                        4: { rice: 30, basico: 24, reason: "Solução rápida, mas o risco de nova quebra é alto, podendo gerar mais custos no futuro." },
+                        5: { rice: 22.5, basico: 26, reason: "A melhor solução a longo prazo, mas o esforço (custo) é altíssimo para o contexto de corte orçamentário." },
+                        6: { rice: 25, basico: 28, reason: "Baixo custo, resolve o problema imediato e preserva o caixa, alinhado perfeitamente com o contexto de austeridade." }
+                    }
+                },
+                 projects: [
+                    { id: 4, title: "Contratar conserto emergencial", cost: 12000, staffCost: 10, effects: { satisfaction: 15, reputation: 10 }, feedback: "Resolveu o problema rapidamente, garantindo a continuidade do serviço." },
+                    { id: 5, title: "Comprar um aparelho novo e moderno", cost: 45000, staffCost: 15, effects: { satisfaction: 15, reputation: 15 }, feedback: "Um investimento no futuro da UBS, garantindo mais eficiência e confiabilidade." },
+                    { id: 6, title: "Alugar um equipamento temporariamente", cost: 4000, staffCost: 5, effects: { satisfaction: 10, reputation: 5 }, feedback: "Uma solução de baixo custo que evitou a interrupção do serviço e preservou o orçamento." },
+                ]
+            },
+            {
+                id: 3,
+                title: "Dilema da Saúde Preventiva",
+                description: "O governo estadual lançou um programa de incentivo para campanhas de prevenção à hipertensão, oferecendo uma verba se a UBS atingir certas metas.",
+                context: "A equipe já está sobrecarregada com a demanda diária. Dedicar tempo a uma nova campanha pode piorar as filas, mas não participar significa perder a verba e a chance de melhorar os indicadores de saúde a longo prazo.",
+                 expertScores: {
+                    gut: 48, gutReason: "É um problema de oportunidade, não uma crise. Gravidade (3) e Urgência (4) médias, com Tendência (4) de piora se a oportunidade for perdida.",
+                    projects: {
+                        7: { rice: 40, basico: 25, reason: "Alto impacto na saúde a longo prazo e na reputação, justificando o esforço extra da equipe." },
+                        8: { rice: 5, basico: 18, reason: "Ação de baixíssimo impacto, que não cumpre as metas e provavelmente não garante a verba." },
+                        9: { rice: 0, basico: 15, reason: "Ignorar a oportunidade tem um custo de oportunidade alto, afetando a reputação e a saúde da comunidade a longo prazo." }
+                    }
+                },
+                 projects: [
+                    { id: 7, title: "Lançar campanha completa (palestras, mutirões)", cost: 10000, staffCost: 50, effects: { satisfaction: 5, reputation: 15 }, feedback: "Uma decisão visionária que investe na saúde futura da comunidade." },
+                    { id: 8, title: "Fazer campanha mínima (apenas cartazes)", cost: 1000, staffCost: 5, effects: { satisfaction: 0, reputation: 2 }, feedback: "Uma tentativa de baixo esforço que não gerou o impacto necessário." },
+                    { id: 9, title: "Ignorar o programa e focar na demanda", cost: 0, staffCost: 0, effects: { satisfaction: -5, reputation: -10 }, feedback: "Priorizou o curto prazo, mas a UBS perdeu uma verba importante e a chance de melhorar a saúde local." },
+                ]
+            },
+            {
+                id: 4,
+                title: "Risco de Perda de Talento",
+                description: "Sua enfermeira-chefe, peça fundamental do programa de vacinação, está visivelmente esgotada e recebeu uma proposta de outro local.",
+                context: "A moral geral da equipe está baixa. A decisão que você tomar com a enfermeira-chefe servirá de exemplo e terá um grande impacto no resto da equipe.",
+                 expertScores: {
+                    gut: 100, gutReason: "Gravidade (5) pela perda de um talento-chave, Urgência (5) pela proposta iminente, e Tendência (4) de contágio para o resto da equipe.",
+                    projects: {
+                        10: { rice: 20, basico: 20, reason: "Resolve o problema individualmente, mas pode gerar insatisfação no resto da equipe e não ataca a causa raiz do esgotamento." },
+                        11: { rice: 50, basico: 28, reason: "Solução estrutural que melhora a condição de trabalho, beneficia a todos e aumenta a retenção a longo prazo." },
+                        12: { rice: 5, basico: 15, reason: "Ação paliativa, vista como superficial pela equipe e que não resolve o problema de sobrecarga ou remuneração." }
+                    }
+                },
+                 projects: [
+                    { id: 10, title: "Oferecer contraproposta (aumento de 20%)", cost: 25000, staffCost: 0, effects: { satisfaction: -5, reputation: 0 }, feedback: "Apagou o incêndio imediato, mas pode ter criado um problema salarial futuro." },
+                    { id: 11, title: "Contratar um enfermeiro assistente para a equipe", cost: 35000, staffCost: 40, effects: { satisfaction: 20, reputation: 10 }, feedback: "Investimento no bem-estar da equipe que aumenta a capacidade e a moral." },
+                    { id: 12, title: "Implementar programa de 'bem-estar' (ginástica laboral)", cost: 3000, staffCost: 5, effects: { satisfaction: 2, reputation: 0 }, feedback: "Uma iniciativa bem-intencionada, mas que não resolveu a sobrecarga de trabalho." },
+                ]
+            }
+        ];
+        const frameworkDetails = {
+            GUT: { name: "Matriz GUT", description: "Avalia a criticidade de problemas (Gravidade, Urgência, Tendência). Multiplique os valores (1-5). Ideal para 'apagar incêndios'.", inputs: `<div class="space-y-4"><div><label class="block font-medium">Gravidade (G): <span id="g-val">3</span></label><p class="text-sm text-gray-500">Qual o impacto do problema?</p><input type="range" id="g-slider" min="1" max="5" value="3" class="w-full"></div><div><label class="block font-medium">Urgência (U): <span id="u-val">3</span></label><p class="text-sm text-gray-500">Qual o prazo para a ação?</p><input type="range" id="u-slider" min="1" max="5" value="3" class="w-full"></div><div><label class="block font-medium">Tendência (T): <span id="t-val">3</span></label><p class="text-sm text-gray-500">O problema vai piorar?</p><input type="range" id="t-slider" min="1" max="5" value="3" class="w-full"></div><div class="text-center bg-blue-100 p-3 rounded-lg"><h4 class="text-lg font-bold">Pontuação GUT: <span id="gut-score" class="text-blue-600">27</span></h4></div></div>` },
+            RICE: { name: "RICE Score", description: "Prioriza projetos (Alcance, Impacto, Confiança, Esforço). Fórmula: (R*I*C)/E. Ótimo para avaliar o retorno sobre o investimento.", inputs: `<div class="space-y-4"><div><label class="block font-medium">Alcance (Reach): <span id="r-val">50</span>%</label><p class="text-sm text-gray-500">Quantos pacientes serão afetados?</p><input type="range" id="r-slider" min="0" max="100" value="50" step="10" class="w-full"></div><div><label class="block font-medium">Impacto (Impact): <span id="i-val">2</span></label><p class="text-sm text-gray-500">Qual o nível de contribuição? (0.25-3)</p><input type="range" id="i-slider" min="0.25" max="3" value="2" step="0.25" class="w-full"></div><div><label class="block font-medium">Confiança (Confidence): <span id="c-val">75</span>%</label><p class="text-sm text-gray-500">Quão confiante você está nas estimativas?</p><input type="range" id="c-slider" min="20" max="100" value="75" step="10" class="w-full"></div><div><label class="block font-medium">Esforço (Effort): <span id="e-val">3</span></label><p class="text-sm text-gray-500">Quanto tempo/recurso será necessário?</p><input type="range" id="e-slider" min="1" max="10" value="3" class="w-full"></div><div class="text-center bg-purple-100 p-3 rounded-lg"><h4 class="text-lg font-bold">Pontuação RICE: <span id="rice-score" class="text-purple-600">25.00</span></h4></div></div>` },
+            BASICO: { name: "Método BASICO", description: "Faz um checklist de viabilidade do projeto. Some as notas (1-5) de 6 critérios. Bom para uma validação 360°.", inputs: `<div class="space-y-2"><p class="text-sm text-gray-500">Dê uma nota de 1 a 5 para cada critério:</p><div class="grid grid-cols-2 gap-4">${['Benefício', 'Abrangência', 'Satisfação', 'Investimento (inverso)', 'Cliente Externo', 'Operacionalização'].map((item, i) => `<div class="bg-gray-50 p-2 rounded"><label class="block font-medium text-sm">${item}</label><input type="number" id="basico-${i}" min="1" max="5" value="3" class="w-full p-1 border rounded"></div>`).join('')}</div><div class="text-center bg-teal-100 p-3 rounded-lg mt-4"><h4 class="text-lg font-bold">Pontuação BASICO: <span id="basico-score" class="text-teal-600">18</span></h4></div></div>` }
+        };
+        const libraryContent = {
+            GUT: { title: 'Matriz GUT', content: `<p><strong>O que é?</strong> Uma ferramenta para priorizar a resolução de problemas.</p><p><strong>Quando usar?</strong> Para diagnosticar a criticidade de problemas existentes. É a primeira etapa: entender o tamanho do "incêndio".</p><ul class="list-disc list-inside mt-2"><li><strong>G (Gravidade):</strong> Qual o impacto do problema nos processos, pessoas e resultados? (1=Mínimo, 5=Máximo)</li><li><strong>U (Urgência):</strong> Qual o prazo para resolver? (1=Longo prazo, 5=Ação imediata)</li><li><strong>T (Tendência):</strong> Se nada for feito, o problema vai piorar? (1=Não vai piorar, 5=Vai piorar rapidamente)</li></ul><p class="mt-2 font-bold">Cálculo: G x U x T. Quanto maior a pontuação, mais crítico é o problema.</p>` },
+            RICE: { title: 'RICE Score', content: `<p><strong>O que é?</strong> Uma ferramenta para priorizar projetos, ideias ou iniciativas.</p><p><strong>Quando usar?</strong> Após diagnosticar o problema, use RICE para comparar as possíveis soluções e ver qual oferece o melhor retorno sobre o investimento.</p><ul class="list-disc list-inside mt-2"><li><strong>R (Reach / Alcance):</strong> Quantas pessoas serão impactadas?</li><li><strong>I (Impact / Impacto):</strong> Qual o nível de contribuição para o objetivo? (0.25 a 3)</li><li><strong>C (Confidence / Confiança):</strong> Quão seguro você está das suas estimativas? (em %)</li><li><strong>E (Effort / Esforço):</strong> Quanto tempo/recurso (pessoa-mês, custo) será necessário?</li></ul><p class="mt-2 font-bold">Cálculo: (R x I x C) / E. Quanto maior a pontuação, maior o retorno.</p>` },
+            BASICO: { title: 'Método BASICO', content: `<p><strong>O que é?</strong> Um checklist para validar a viabilidade de uma solução.</p><p><strong>Quando usar?</strong> Como uma análise complementar ao RICE, para garantir que a solução é prática e alinhada com os objetivos gerais.</p><p class="mt-2">Dê uma nota de 1 a 5 para cada critério. A soma define a pontuação.</p><ul class="list-disc list-inside mt-2"><li><strong>B</strong>enefícios para a organização</li><li><strong>A</strong>brangência dos resultados</li><li><strong>S</strong>atisfação do cliente/usuário</li><li><strong>I</strong>nvestimento requerido (nota alta para baixo investimento)</li><li><strong>C</strong>liente externo (impacto positivo)</li><li><strong>O</strong>peracionalização simples</li></ul>` }
+        };
+        const tutorialSteps = [
+            { element: '#hud', title: 'Seu Painel de Controle', text: 'Fique de olho nestes indicadores. Suas decisões afetarão o Orçamento, a Equipe, a Satisfação e a Reputação.' },
+            { element: '#scenario-phase', title: 'Diagnóstico do Problema', text: 'Todo mês começa aqui. Leia o cenário e o contexto, depois clique para diagnosticar a criticidade do problema com a Matriz GUT.' },
+            { element: '#solution-phase', title: 'Análise de Soluções', text: 'Após o diagnóstico, esta área aparecerá. Analise cada projeto com RICE e BASICO para comparar as soluções.' },
+            { element: '#library-btn', title: 'Biblioteca de Gestão', text: 'Se tiver dúvidas sobre as ferramentas, clique aqui a qualquer momento para consultar o manual.' },
+            { element: null, title: 'Tudo Pronto!', text: 'Lembre-se: diagnostique o problema, analise as soluções e decida com sabedoria. Boa sorte, gestor(a)!' }
+        ];
+
+        let gameState = {
+            month: 1, budget: 100000, staff: 120, satisfaction: 50, reputation: 40,
+            currentScenarioIndex: 0, problemGutScore: null, analysisScores: {},
+            currentAnalysisTarget: null, currentFramework: null, isDecisionMode: false,
+        };
+        let currentTutorialStep = 0;
+
+        // --- FUNÇÕES DE LÓGICA DO JOGO ---
+        const updateHUD = () => { document.getElementById('hud-month').textContent = gameState.month; document.getElementById('hud-budget').textContent = `R$ ${gameState.budget.toLocaleString('pt-BR')}`; document.getElementById('hud-staff').textContent = gameState.staff; const updateBar = (element, value) => { const clampedValue = Math.max(0, Math.min(100, value)); element.style.width = `${clampedValue}%`; element.textContent = `${clampedValue}%`; }; updateBar(document.getElementById('hud-satisfaction'), gameState.satisfaction); updateBar(document.getElementById('hud-reputation'), gameState.reputation); };
+        const loadScenario = (scenarioIndex) => { const scenario = scenarios[scenarioIndex]; gameState.problemGutScore = null; gameState.analysisScores = {}; scenario.projects.forEach(p => { gameState.analysisScores[p.id] = { rice: null, basico: null }; }); document.getElementById('scenario-title').textContent = scenario.title; document.getElementById('scenario-description').textContent = scenario.description; document.getElementById('context-text').textContent = scenario.context; document.getElementById('problem-gut-score').innerHTML = ''; document.getElementById('scenario-phase').classList.remove('hidden'); document.getElementById('diagnosis-step').classList.remove('hidden'); document.getElementById('solution-phase').classList.add('hidden'); setDecisionMode(false); };
+        const renderProjectCards = () => { const container = document.getElementById('projects-container'); const scenario = scenarios[gameState.currentScenarioIndex]; container.innerHTML = ''; scenario.projects.forEach(project => { const scores = gameState.analysisScores[project.id]; const card = document.createElement('div'); card.className = 'project-card bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm'; card.dataset.projectId = project.id; card.innerHTML = `<h4 class="text-lg font-bold text-blue-700">${project.title}</h4><p class="text-sm text-gray-600 my-1">Custo: <span class="font-bold">R$ ${project.cost.toLocaleString('pt-BR')}</span></p><p class="text-sm text-gray-600 my-1">Equipe: <span class="font-bold">${project.staffCost} Horas</span></p><div class="mt-4 flex flex-wrap gap-2"><button data-framework="RICE" class="btn-framework text-xs bg-purple-500 text-white font-semibold py-1 px-3 rounded-full hover:bg-purple-600">Analisar RICE</button><button data-framework="BASICO" class="btn-framework text-xs bg-teal-500 text-white font-semibold py-1 px-3 rounded-full hover:bg-teal-600">Analisar BASICO</button></div><div class="mt-3 pt-3 border-t border-gray-200 space-x-2" id="scores-${project.id}">${scores.rice !== null ? `<span class="score-badge bg-purple-500">RICE: ${scores.rice.toFixed(2)}</span>` : ''}${scores.basico !== null ? `<span class="score-badge bg-teal-500">BASICO: ${scores.basico}</span>` : ''}</div>`; container.appendChild(card); }); };
+        const openAnalysisModal = (target, framework) => { gameState.currentAnalysisTarget = target; gameState.currentFramework = framework; const isProblem = target.hasOwnProperty('projects'); document.getElementById('modal-verb').textContent = isProblem ? 'Diagnosticando' : 'Analisando'; document.getElementById('modal-title').textContent = isProblem ? 'Problema Atual' : target.title; const frameworkInfo = document.getElementById('framework-info'); frameworkInfo.innerHTML = `<h3 class="font-bold text-lg">${frameworkDetails[framework].name}</h3><p class="text-sm">${frameworkDetails[framework].description}</p>`; document.getElementById('analysis-inputs').innerHTML = frameworkDetails[framework].inputs; setupAnalysisListeners(framework); document.getElementById('analysis-modal').classList.remove('hidden'); };
+        const saveAnalysis = () => { const framework = gameState.currentFramework; let score = parseFloat(document.getElementById(`${framework.toLowerCase()}-score`).textContent); const isProject = !gameState.currentAnalysisTarget.hasOwnProperty('projects'); if (isProject) { gameState.analysisScores[gameState.currentAnalysisTarget.id][framework.toLowerCase()] = score; renderProjectCards(); } else { gameState.problemGutScore = score; document.getElementById('problem-gut-score').innerHTML = `Pontuação de Criticidade (GUT): <span class="text-red-600">${score}</span>`; document.getElementById('diagnosis-step').classList.add('hidden'); document.getElementById('solution-phase').classList.remove('hidden'); renderProjectCards(); } closeAnalysisModal(); };
+        const setDecisionMode = (isDeciding) => { gameState.isDecisionMode = isDeciding; const cards = document.querySelectorAll('.project-card'); const instructionText = document.getElementById('instruction-text'); const finalizeBtn = document.getElementById('finalize-decision-btn'); if (isDeciding) { instructionText.textContent = "Excelente análise! Agora, clique no card do projeto que você deseja implementar."; instructionText.classList.add('text-green-700', 'font-bold'); finalizeBtn.classList.add('hidden'); cards.forEach(c => c.classList.add('selectable')); } else { instructionText.textContent = "Problema diagnosticado. Agora, analise as propostas com RICE e BASICO. Depois, finalize para decidir."; instructionText.classList.remove('text-green-700', 'font-bold'); finalizeBtn.classList.remove('hidden'); cards.forEach(c => c.classList.remove('selectable', 'selected')); } };
+        const confirmDecision = (projectId) => { const scenario = scenarios[gameState.currentScenarioIndex]; const project = scenario.projects.find(p => p.id === projectId); if (gameState.budget < project.cost) { alert("Orçamento insuficiente!"); return; } if (gameState.staff < project.staffCost) { alert("Equipe sem horas disponíveis!"); return; } gameState.budget -= project.cost; gameState.staff -= project.staffCost; Object.keys(project.effects).forEach(key => { gameState[key] += project.effects[key]; }); showResultModal(project); };
+        const showResultModal = (chosenProject) => { const scenario = scenarios[gameState.currentScenarioIndex]; const expert = scenario.expertScores; document.getElementById('result-title').textContent = `Decisão Tomada: ${chosenProject.title}`; const consequencesDiv = document.getElementById('result-consequences'); consequencesDiv.innerHTML = `<p>💸 Orçamento: <span class="font-bold text-red-500">- R$ ${chosenProject.cost.toLocaleString('pt-BR')}</span></p><p>👥 Equipe: <span class="font-bold text-red-500">- ${chosenProject.staffCost} Horas</span></p>`; Object.keys(chosenProject.effects).forEach(key => { const value = chosenProject.effects[key]; const color = value >= 0 ? 'text-green-500' : 'text-red-500'; const sign = value >= 0 ? '+' : ''; consequencesDiv.innerHTML += `<p>${key.charAt(0).toUpperCase() + key.slice(1)}: <span class="font-bold ${color}">${sign}${value}%</span></p>`; }); const analysisFeedbackDiv = document.getElementById('analysis-feedback'); let analysisHTML = `<h4 class="font-semibold text-gray-700">Feedback da sua Análise:</h4>`; analysisHTML += `<p class="text-xs"><strong>Diagnóstico (GUT):</strong> Sua nota foi ${gameState.problemGutScore}. A nossa foi ${expert.gut}. <strong>Justificativa:</strong> ${expert.gutReason}</p>`; const userScores = gameState.analysisScores[chosenProject.id]; const expertScores = expert.projects[chosenProject.id]; if(userScores.rice !== null) { analysisHTML += `<p class="text-xs mt-2"><strong>Projeto (RICE):</strong> Sua nota foi ${userScores.rice.toFixed(2)}. A nossa foi ${expertScores.rice.toFixed(2)}. <strong>Justificativa:</strong> ${expertScores.reason}</p>`;} analysisFeedbackDiv.innerHTML = analysisHTML; const decisionFeedbackDiv = document.getElementById('decision-feedback'); let decisionHTML = `<h4 class="font-semibold text-gray-700">Feedback da sua Decisão:</h4>`; decisionHTML += `<p class="text-xs"><strong>Sua escolha:</strong> ${chosenProject.feedback}</p>`; const otherProjects = scenario.projects.filter(p => p.id !== chosenProject.id); if (otherProjects.length > 0) { decisionHTML += `<p class="text-xs mt-1"><strong>Custo de Oportunidade:</strong> Ao não escolher <strong>${otherProjects[0].title}</strong>, você abriu mão de: ${otherProjects[0].feedback.split('.')[0].toLowerCase()}.</p>`; } decisionFeedbackDiv.innerHTML = decisionHTML; document.getElementById('result-modal').classList.remove('hidden'); };
+        const nextMonth = () => { document.getElementById('result-modal').classList.add('hidden'); gameState.month++; gameState.currentScenarioIndex++; if (gameState.currentScenarioIndex >= scenarios.length) { endGame(); return; } gameState.satisfaction = Math.max(0, gameState.satisfaction - 5); gameState.staff += 20; updateHUD(); loadScenario(gameState.currentScenarioIndex); };
+        const endGame = () => { document.getElementById('game-area').classList.add('hidden'); document.getElementById('end-game-screen').classList.remove('hidden'); const { budget, satisfaction, reputation } = gameState; let profileTitle, financialFeedback, patientFeedback, strategicFeedback; if (budget > 50000 && satisfaction > 70 && reputation > 60) { profileTitle = "Gestor(a) Visionário(a)"; financialFeedback = "Excelente controle financeiro, terminando com um orçamento robusto que permite futuros investimentos."; patientFeedback = "A satisfação dos pacientes é altíssima. Suas decisões claramente priorizaram o bem-estar da comunidade."; strategicFeedback = "Você demonstrou uma incrível capacidade de equilibrar necessidades imediatas com oportunidades futuras, fortalecendo a reputação da UBS."; } else if (budget < 10000 && satisfaction > 60) { profileTitle = "Herói(na) do Povo"; financialFeedback = "Você gastou quase todo o orçamento, uma aposta arriscada. Embora tenha funcionado, a falta de reservas é um risco para o futuro."; patientFeedback = "Os pacientes te adoram! Sua gestão foi focada neles, mesmo que tenha custado caro."; strategicFeedback = "Sua força é a ação e o foco no cliente, mas é preciso ter mais atenção ao planejamento financeiro a longo prazo."; } else if (budget > 80000 && satisfaction < 50) { profileTitle = "Administrador(a) Cauteloso(a)"; financialFeedback = "Sua prudência financeira é notável, com um caixa final muito saudável."; patientFeedback = "Apesar da saúde financeira, a satisfação dos pacientes ficou abaixo do ideal. Talvez algumas decisões tenham sido conservadoras demais."; strategicFeedback = "Você é um excelente guardião dos recursos, mas o desafio é converter essa estabilidade em maior impacto e satisfação para a comunidade."; } else { profileTitle = "Gestor(a) em Desenvolvimento"; financialFeedback = "A gestão financeira foi um desafio, com altos e baixos. É crucial analisar o custo-benefício de cada decisão."; patientFeedback = "A satisfação dos pacientes oscilou. Lembre-se que eles são o centro do serviço de saúde."; strategicFeedback = "Cada desafio é uma lição. Continue praticando para aprimorar seu equilíbrio entre apagar incêndios e construir o futuro."; } document.getElementById('manager-profile-title').textContent = profileTitle; document.getElementById('financial-feedback').textContent = financialFeedback; document.getElementById('patient-feedback').textContent = patientFeedback; document.getElementById('strategic-feedback').textContent = strategicFeedback; };
+        const closeAnalysisModal = () => { document.getElementById('analysis-modal').classList.add('hidden'); };
+        const closeLibrary = () => { document.getElementById('library-modal').classList.add('hidden'); };
+        const setupAnalysisListeners = (framework) => { if (framework === 'GUT') { const gSlider = document.getElementById('g-slider'); const uSlider = document.getElementById('u-slider'); const tSlider = document.getElementById('t-slider'); const updateGUTScore = () => { document.getElementById('g-val').textContent = gSlider.value; document.getElementById('u-val').textContent = uSlider.value; document.getElementById('t-val').textContent = tSlider.value; const score = gSlider.value * uSlider.value * tSlider.value; document.getElementById('gut-score').textContent = score; }; [gSlider, uSlider, tSlider].forEach(s => s.addEventListener('input', updateGUTScore)); updateGUTScore(); } else if (framework === 'RICE') { const rSlider = document.getElementById('r-slider'); const iSlider = document.getElementById('i-slider'); const cSlider = document.getElementById('c-slider'); const eSlider = document.getElementById('e-slider'); const updateRICEScore = () => { document.getElementById('r-val').textContent = `${rSlider.value}%`; document.getElementById('i-val').textContent = iSlider.value; document.getElementById('c-val').textContent = `${cSlider.value}%`; document.getElementById('e-val').textContent = eSlider.value; const effort = parseFloat(eSlider.value); const score = effort > 0 ? ((rSlider.value * iSlider.value * (cSlider.value / 100)) / effort) : 0; document.getElementById('rice-score').textContent = score.toFixed(2); }; [rSlider, iSlider, cSlider, eSlider].forEach(s => s.addEventListener('input', updateRICEScore)); updateRICEScore(); } else if (framework === 'BASICO') { const inputs = document.querySelectorAll('#analysis-inputs input[type="number"]'); const updateBASICOScore = () => { let score = 0; inputs.forEach(input => { let value = parseInt(input.value); if(isNaN(value) || value < 1) value = 1; if(value > 5) value = 5; input.value = value; score += value; }); document.getElementById('basico-score').textContent = score; }; inputs.forEach(i => i.addEventListener('input', updateBASICOScore)); updateBASICOScore(); } };
+        
+        // --- TUTORIAL E BIBLIOTECA ---
+        const startTutorial = () => { document.getElementById('start-screen').classList.add('hidden'); document.getElementById('game-area').classList.remove('hidden'); loadScenarioForTutorial(); document.getElementById('tutorial-overlay').classList.remove('hidden'); currentTutorialStep = 0; updateTutorialStep(); };
+        const loadScenarioForTutorial = () => { const scenario = scenarios[0]; document.getElementById('scenario-title').textContent = scenario.title; document.getElementById('scenario-description').textContent = scenario.description; document.getElementById('context-text').textContent = scenario.context; gameState.analysisScores = {}; scenario.projects.forEach(p => { gameState.analysisScores[p.id] = { rice: null, basico: null }; }); };
+        const updateTutorialStep = () => { document.querySelectorAll('.highlight-overlay').forEach(el => el.classList.remove('highlight-overlay')); const step = tutorialSteps[currentTutorialStep]; const tutorialBox = document.getElementById('tutorial-box'); if (!tutorialBox) return; if (currentTutorialStep === 2) { document.getElementById('diagnosis-step').classList.add('hidden'); document.getElementById('solution-phase').classList.remove('hidden'); if (document.getElementById('projects-container').innerHTML === '') { renderProjectCards(); } } else if (currentTutorialStep < 2) { document.getElementById('diagnosis-step').classList.remove('hidden'); document.getElementById('solution-phase').classList.add('hidden'); } document.getElementById('tutorial-title').textContent = step.title; document.getElementById('tutorial-text').textContent = step.text; document.getElementById('tutorial-step-counter').textContent = `Passo ${currentTutorialStep + 1} de ${tutorialSteps.length}`; document.getElementById('tutorial-prev-btn').classList.toggle('hidden', currentTutorialStep === 0); document.getElementById('tutorial-next-btn').textContent = (currentTutorialStep === tutorialSteps.length - 1) ? 'Começar Jogo!' : 'Próximo'; if (step.element) { const targetElement = document.querySelector(step.element); if (targetElement) { targetElement.classList.add('highlight-overlay'); const rect = targetElement.getBoundingClientRect(); tutorialBox.style.top = `${rect.bottom + 10}px`; tutorialBox.style.left = `${rect.left}px`; if (rect.left + tutorialBox.offsetWidth > window.innerWidth) { tutorialBox.style.left = `${window.innerWidth - tutorialBox.offsetWidth - 20}px`; } if (rect.bottom + tutorialBox.offsetHeight > window.innerHeight) { tutorialBox.style.top = `${rect.top - tutorialBox.offsetHeight - 10}px`; } } } else { tutorialBox.style.top = '50%'; tutorialBox.style.left = '50%'; tutorialBox.style.transform = 'translate(-50%, -50%)'; } };
+        const advanceTutorial = () => { if (currentTutorialStep < tutorialSteps.length - 1) { currentTutorialStep++; updateTutorialStep(); } else { endTutorial(); } };
+        const regressTutorial = () => { if (currentTutorialStep > 0) { currentTutorialStep--; updateTutorialStep(); } };
+        const endTutorial = () => { document.querySelectorAll('.highlight-overlay').forEach(el => el.classList.remove('highlight-overlay')); document.getElementById('tutorial-overlay').classList.add('hidden'); loadScenario(0); };
+        const openLibrary = () => { const modal = document.getElementById('library-modal'); const tabsContainer = document.getElementById('library-tabs'); tabsContainer.innerHTML = ''; Object.keys(libraryContent).forEach((key, index) => { const tab = document.createElement('button'); tab.className = `tab-btn py-2 px-4 text-sm font-medium border-b-2 border-transparent hover:border-gray-300`; tab.textContent = libraryContent[key].title; tab.dataset.target = key; if (index === 0) tab.classList.add('active'); tabsContainer.appendChild(tab); }); showLibraryContent('GUT'); modal.classList.remove('hidden'); };
+        const showLibraryContent = (key) => { document.getElementById('library-content').innerHTML = libraryContent[key].content; };
+        
+        // --- SETUP DE EVENTOS E INICIALIZAÇÃO ---
+        function setupEventListeners() {
+            document.body.addEventListener('click', (e) => {
+                // Main Buttons
+                if (e.target.id === 'start-tutorial-btn') startTutorial();
+                if (e.target.id === 'library-btn') openLibrary();
+                if (e.target.id === 'diagnose-problem-btn') openAnalysisModal(scenarios[gameState.currentScenarioIndex], 'GUT');
+                if (e.target.id === 'finalize-decision-btn') setDecisionMode(true);
+                if (e.target.id === 'restart-game-btn') window.location.reload();
+
+                // Project Card Buttons
+                const projectCardButton = e.target.closest('.btn-framework');
+                if (projectCardButton) {
+                    const card = projectCardButton.closest('.project-card');
+                    const projectId = parseInt(card.dataset.projectId);
+                    const project = scenarios[gameState.currentScenarioIndex].projects.find(p => p.id === projectId);
+                    openAnalysisModal(project, projectCardButton.dataset.framework);
+                }
+                
+                // Project Card Selection
+                const selectableCard = e.target.closest('.project-card.selectable');
+                if (selectableCard) {
+                    const projectId = parseInt(selectableCard.dataset.projectId);
+                    document.querySelectorAll('.project-card').forEach(c => c.classList.remove('selected'));
+                    selectableCard.classList.add('selected');
+                    setTimeout(() => confirmDecision(projectId), 300);
+                }
+
+                // Modal Buttons
+                if (e.target.id === 'modal-cancel-btn') closeAnalysisModal();
+                if (e.target.id === 'modal-save-btn') saveAnalysis();
+                if (e.target.id === 'next-month-btn') nextMonth();
+                if (e.target.id === 'close-library-btn') closeLibrary();
+                
+                // Library Tabs
+                const tabButton = e.target.closest('.tab-btn');
+                if (tabButton) {
+                    document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+                    tabButton.classList.add('active');
+                    showLibraryContent(tabButton.dataset.target);
+                }
+                
+                // Tutorial Buttons
+                if (e.target.id === 'tutorial-next-btn') advanceTutorial();
+                if (e.target.id === 'tutorial-prev-btn') regressTutorial();
+            });
+        }
+        
+        function initializeGame() {
+            document.getElementById('hud').innerHTML = `<div id="hud-month-item" class="stat-item"><h3 class="font-bold text-sm md:text-base text-gray-700">Mês: <span id="hud-month">1</span></h3></div><div id="hud-budget-item" class="stat-item"><h3 class="font-bold text-sm md:text-base text-gray-700">Orçamento: <span id="hud-budget" class="text-green-600">R$ 100.000</span></h3></div><div id="hud-staff-item" class="stat-item"><h3 class="font-bold text-sm md:text-base text-gray-700">Equipe (H/Mês): <span id="hud-staff" class="text-purple-600">120</span></h3></div><div id="hud-satisfaction-item" class="stat-item"><label class="block text-sm font-medium text-gray-700">Satisfação</label><div class="hud-stat-bar"><div id="hud-satisfaction" class="hud-stat-fill bg-blue-500" style="width: 50%;">50%</div></div></div><div id="hud-reputation-item" class="stat-item"><label class="block text-sm font-medium text-gray-700">Reputação</label><div class="hud-stat-bar"><div id="hud-reputation" class="hud-stat-fill bg-yellow-500" style="width: 40%;">40%</div></div></div>`;
+            document.getElementById('analysis-modal').innerHTML = `<div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8 transform scale-95"><h2 class="text-2xl font-bold mb-2"><span id="modal-verb"></span>: <span id="modal-title" class="text-blue-600"></span></h2><div id="framework-info" class="bg-gray-100 p-4 rounded-lg mb-6"></div><div id="analysis-inputs"></div><div class="mt-8 text-right space-x-4"><button id="modal-cancel-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400">Cancelar</button><button id="modal-save-btn" class="bg-blue-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-600">Salvar Análise</button></div></div>`;
+            document.getElementById('result-modal').innerHTML = `<div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8 transform scale-95"><h2 id="result-title" class="text-3xl font-bold mb-6 text-center"></h2><div class="grid grid-cols-1 lg:grid-cols-3 gap-6"><div class="lg:col-span-1"><h3 class="font-bold text-lg mb-2 text-gray-800">Impacto da sua Decisão:</h3><div id="result-consequences" class="text-left space-y-2 p-4 bg-gray-50 rounded-lg"></div></div><div class="lg:col-span-2"><h3 class="font-bold text-lg mb-2 text-gray-800">Feedback do Gerente Sênior:</h3><div class="p-4 bg-blue-50 rounded-lg space-y-4"><div id="analysis-feedback"></div><div id="decision-feedback"></div></div></div></div><button id="next-month-btn" class="w-full mt-6 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700">Ir para o Próximo Mês</button></div>`;
+            document.getElementById('library-modal').innerHTML = `<div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 transform scale-95"><h2 class="text-3xl font-bold mb-4">Biblioteca de Gestão</h2><div class="border-b border-gray-200 mb-4"><nav class="flex -mb-px" id="library-tabs"></nav></div><div id="library-content"></div><button id="close-library-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button></div>`;
+            document.getElementById('tutorial-overlay').innerHTML = `<div id="tutorial-box" class="tutorial-box absolute bg-white p-6 rounded-lg shadow-2xl max-w-sm"><h3 id="tutorial-title" class="text-xl font-bold mb-2"></h3><p id="tutorial-text" class="text-gray-700 mb-4"></p><div class="flex justify-between items-center"><span id="tutorial-step-counter" class="text-sm text-gray-500"></span><div><button id="tutorial-prev-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-400">Anterior</button><button id="tutorial-next-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Próximo</button></div></div></div>`;
+            setupEventListeners();
+            updateHUD();
+        }
+
+        window.onload = initializeGame;
+    </script>
+</body>
+</html>
